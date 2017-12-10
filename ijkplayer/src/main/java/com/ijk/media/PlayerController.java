@@ -5,6 +5,8 @@ import android.app.Dialog;
 import android.content.Context;
 import android.media.AudioManager;
 import android.os.Handler;
+import android.os.HandlerThread;
+import android.os.Looper;
 import android.os.Message;
 import android.support.annotation.NonNull;
 import android.util.Log;
@@ -12,6 +14,7 @@ import android.view.Gravity;
 import android.view.LayoutInflater;
 import android.view.MotionEvent;
 import android.view.View;
+import android.view.ViewGroup;
 import android.view.Window;
 import android.view.WindowManager;
 import android.widget.CheckBox;
@@ -30,6 +33,7 @@ import com.ijk.ui.WindowManagerCtroller;
 import tv.danmaku.ijk.media.player.IMediaPlayer;
 import tv.danmaku.ijk.media.player.IjkMediaPlayer;
 import tv.danmaku.ijk.media.player.utils.ReBuildTimeUtils;
+import tv.danmaku.ijk.media.player.utils.ThreadPoolUtils;
 import tv.danmaku.ijk.media.player.utils.VideoUtils;
 import tv.danmaku.ijk.media.player.utils.WindowUtils;
 
@@ -39,7 +43,7 @@ import tv.danmaku.ijk.media.player.utils.WindowUtils;
  */
 
 public class PlayerController extends FrameLayout implements View.OnClickListener,
-        SeekBar.OnSeekBarChangeListener, View.OnTouchListener, MediaController {
+        SeekBar.OnSeekBarChangeListener, View.OnTouchListener, IMediaController.MediaController {
 
     public static final int KEEPGOING = 0x001;
     public static final int START = 0x003;
@@ -83,17 +87,25 @@ public class PlayerController extends FrameLayout implements View.OnClickListene
     private TextView mDialogBrightnessTextView;
     private ProgressBar mDialogBrightnessProgressBar;
     private ProgressBar progressBar;
-    private Handler handler;
     private int progress;
     private long temp;
+    private boolean isSeekBarChange;
     private boolean isPlayFinish;
     private ImageView changescreen;
     private ImageView smallscreen;
     private View v;
+    private ViewController viewController;
+    private Activity activity;
+    private Handler mainHandler;
+    private HandlerThread ht;
+    private Handler handler;
+    private IjkVideoView ijkVideoView;
+    private FrameLayout baseFramelayout;
+    private String tempCurrent = "00:00";
 
     public PlayerController(@NonNull Context context) {
         super(context);
-        this.context = context.getApplicationContext();
+        this.context = context;
         init();
     }
 
@@ -112,6 +124,8 @@ public class PlayerController extends FrameLayout implements View.OnClickListene
         currentTv = findViewById(R.id.current);
         currentTv.setOnClickListener(this);
         seekBar = findViewById(R.id.bottom_seek_progress);
+        seekBar.setOnTouchListener(this);
+        //seekBar.setOnSeekBarChangeListener(this);
         totalTv = findViewById(R.id.total);
         totalTv.setOnClickListener(this);
         changescreen = findViewById(R.id.changescreen);
@@ -128,31 +142,42 @@ public class PlayerController extends FrameLayout implements View.OnClickListene
     @Override
     public void setVideoPlayer(final IMediaPlayer iMediaPlayer) {
         this.iMediaPlayer = iMediaPlayer;
-        handler = new Handler(new Handler.Callback() {
+        mainHandler = new Handler(Looper.getMainLooper());
+        ht = new HandlerThread("refreshCurrent");
+        ht.start();
+        handler = new Handler(ht.getLooper()) {
             @Override
-            public boolean handleMessage(Message msg) {
-
-                if (iMediaPlayer.getDuration() == 0){
-                    return true;
+            public void handleMessage(Message msg) {
+                if (iMediaPlayer.getDuration() == 0 || currentTv == null) {
+                    return;
                 }
 
                 if (msg.what == START) {
-                    seekBar.setProgress(0);
-                    pauseStart.setChecked(false);
+                    mainHandler.post(new Runnable() {
+                        @Override
+                        public void run() {
+                            seekBar.setProgress(0);
+                            pauseStart.setChecked(false);
+                        }
+                    });
                 }
                 if (msg.what == KEEPGOING) {
                     handler.sendEmptyMessageDelayed(KEEPGOING, 1000);
-//                    if (isViewVisible){
-//                        handler.sendEmptyMessageDelayed(VIEWINVISIBLE, 3000);
-//                    }
                 }
+
                 if (msg.what == STOP) {
-                    if (!isViewVisible) {
-                        invisibleView();
-                        isViewVisible = !isViewVisible;
-                    }
-                    isPlayFinish = true;
-                    pauseStart.setChecked(true);
+                    mainHandler.post(new Runnable() {
+                        @Override
+                        public void run() {
+                            if (!isViewVisible) {
+                                invisibleView();
+                                isViewVisible = !isViewVisible;
+                            }
+                            isPlayFinish = true;
+                            pauseStart.setChecked(true);
+
+                        }
+                    });
                     handler.removeMessages(KEEPGOING);
                 }
 //                if (msg.what == VIEWINVISIBLE) {
@@ -160,18 +185,24 @@ public class PlayerController extends FrameLayout implements View.OnClickListene
 //                }
                 //我用oppo r9s测试这里总是有问题的，ijkplayer issues里也有这个问题，暂未解决，我这里
                 //老是差1s左右，先手动加上了。就看ijk怎么解决了。不同机型或者视频可能会有差异。
-                currentTv.setText(ReBuildTimeUtils.buildTime(
-                        iMediaPlayer.getCurrentPosition() + 1000));
+                tempCurrent = ReBuildTimeUtils.buildTime(
+                        iMediaPlayer.getCurrentPosition() + 1000);
                 progress = Integer.parseInt(String.valueOf(((iMediaPlayer.getCurrentPosition() + 1000) * 100 / iMediaPlayer.getDuration())));
-                Log.e("setProgress", "progress:" + iMediaPlayer.getCurrentPosition() + "----" + iMediaPlayer.getDuration() + "---" + progress);
-                if (progress > 100) {
-                    seekBar.setProgress(100);
-                } else {
-                    seekBar.setProgress(progress);
-                }
-                return true;
+                mainHandler.post(new Runnable() {
+                    @Override
+                    public void run() {
+                        currentTv.setText(tempCurrent);
+                        if (progress > 100) {
+                            seekBar.setProgress(100);
+                        } else {
+                            seekBar.setProgress(progress);
+                        }
+                    }
+                });
+
             }
-        });
+        };
+
         viewController.onHandler(handler);
     }
 
@@ -197,14 +228,55 @@ public class PlayerController extends FrameLayout implements View.OnClickListene
             AudioManager am = (AudioManager) context.getSystemService(Context.AUDIO_SERVICE);
             am.abandonAudioFocus(null);
         }
+        ht.getLooper().quit();
+        if (mainHandler != null) {
+            mainHandler.removeMessages(STOP);
+            mainHandler.removeMessages(START);
+            mainHandler = null;
+        }
+       ThreadPoolUtils.execute(new Runnable() {
+           @Override
+           public void run() {
+               if (null != v) {
+                   lockScreen = null;
+                   vName = null;
+                   pauseStart = null;
+                   currentTv = null;
+                   seekBar = null;
+                   totalTv = null;
+                   mProgressDialog = null;
+                   mDialogProgressBar = null;
+                   mDialogSeekTime = null;
+                   mDialogTotalTime = null;
+                   mDialogIcon = null;
+                   mVolumeDialog = null;
+                   mDialogVolumeImageView = null;
+                   mDialogVolumeTextView = null;
+                   mDialogVolumeProgressBar = null;
+                   mBrightnessDialog = null;
+                   mDialogBrightnessTextView = null;
+                   mDialogBrightnessProgressBar = null;
+                   progressBar = null;
+                   changescreen = null;
+                   smallscreen = null;
+                   viewController = null;
+                   activity = null;
+               }
+               if (null != ijkVideoView){
+                   ijkVideoView = null;
+               }
+               if (null != baseFramelayout){
+                   baseFramelayout = null;
+               }
+           }
+       });
     }
 
-    private ViewController viewController;
-    private Activity activity;
+
     @Override
-    public void setControllerView(ViewController viewController,Activity activity) {
+    public void setControllerView(ViewController viewController, Activity activity) {
         this.activity = activity;
-        WindowManager.LayoutParams lp =  activity.getWindow()
+        WindowManager.LayoutParams lp = activity.getWindow()
                 .getAttributes();
         lp.alpha = 1f;
         activity.getWindow().setAttributes(lp);
@@ -225,13 +297,9 @@ public class PlayerController extends FrameLayout implements View.OnClickListene
 
     @Override
     public void setVideoName(String name) {
-        vName.setText(name);
+            vName.setText(name);
     }
 
-    @Override
-    public void setVisible() {
-
-    }
 
     private boolean isViewVisible = true;
 
@@ -277,15 +345,21 @@ public class PlayerController extends FrameLayout implements View.OnClickListene
             }
             if (WindowUtils.checkFloatWindowPermission(context)) {
                 baseFramelayout.removeView(ijkVideoView);
-                Log.e("baseFramelayout", "baseFramelayout:" + baseFramelayout);
                 viewController.setWindowManager();
                 if (null == screenListener) {
                     return;
                 }
-                screenListener.finishDontClean(true);
-                WindowManagerCtroller.getWindowManagerCtroller(context).createWindowView(viewController,ijkVideoView);
+                if (null != activity) {
+                    activity = null;
+                }
+                boolean isCreate = WindowManagerCtroller.getWindowManagerCtroller(context).createWindowView(viewController, ijkVideoView);
+                if (isCreate){
+                    screenListener.finishDontClean(false);
+                }else {
+                    screenListener.finishDontClean(true);
+                }
             } else {
-                WindowUtils.showDialogTipUserRequestPermission(context);
+                WindowUtils.showDialogTipUserRequestPermission(activity);
             }
         }
         if (viewId == R.id.changescreen) {
@@ -299,9 +373,16 @@ public class PlayerController extends FrameLayout implements View.OnClickListene
 
     @Override
     public void onProgressChanged(SeekBar seekBar, int progress, boolean fromUser) {
-        temp = progress * iMediaPlayer.getDuration() / 100;
-        currentTv.setText(ReBuildTimeUtils.buildTime(iMediaPlayer.getCurrentPosition()));
-        iMediaPlayer.seekTo(temp);
+//        if (isSeekBarChange){
+//            temp = progress * iMediaPlayer.getDuration() / 100;
+//            currentTv.setText(ReBuildTimeUtils.buildTime(iMediaPlayer.getCurrentPosition()));
+//            iMediaPlayer.seekTo(temp);
+//        }else {
+            temp = progress * iMediaPlayer.getDuration() / 100;
+            currentTv.setText(ReBuildTimeUtils.buildTime(iMediaPlayer.getCurrentPosition()));
+            iMediaPlayer.seekTo(temp);
+//        }
+
     }
 
     @Override
@@ -317,6 +398,19 @@ public class PlayerController extends FrameLayout implements View.OnClickListene
 
     @Override
     public boolean onTouch(View v, MotionEvent event) {
+
+        if (v.getId() == R.id.bottom_seek_progress){
+            if (lockScreen.isChecked()) {
+                return false;
+            }
+            if (event.getAction() == MotionEvent.ACTION_DOWN){
+                isSeekBarChange = true;
+            }
+            if (event.getAction() == MotionEvent.ACTION_UP){
+                isSeekBarChange = false;
+            }
+            return false;
+        }
 
         float x = event.getX();
         float y = event.getY();
@@ -423,7 +517,7 @@ public class PlayerController extends FrameLayout implements View.OnClickListene
 
     private void showProgressDialog(float deltaX, String seekTime, float seekTimePosition, long totalTimeDuration) {
         if (mProgressDialog == null) {
-            View localView = LayoutInflater.from(context).inflate(R.layout.dialog_progress, null);
+            View localView = LayoutInflater.from(activity).inflate(R.layout.dialog_progress, null);
             mDialogProgressBar = localView.findViewById(R.id.duration_progressbar);
             mDialogProgressBar.setOnSeekBarChangeListener(this);
             mDialogSeekTime = localView.findViewById(R.id.tv_current);
@@ -448,7 +542,7 @@ public class PlayerController extends FrameLayout implements View.OnClickListene
     }
 
     private Dialog createDialogWithView(View localView) {
-        Dialog dialog = new Dialog(getContext(), R.style.style_dialog_progress);
+        Dialog dialog = new Dialog(activity, R.style.style_dialog_progress);
         dialog.setContentView(localView);
         Window window = dialog.getWindow();
         window.addFlags(Window.FEATURE_ACTION_BAR);
@@ -475,7 +569,7 @@ public class PlayerController extends FrameLayout implements View.OnClickListene
 
     private void showBrightnessDialog(int brightnessPercent) {
         if (mBrightnessDialog == null) {
-            View localView = LayoutInflater.from(context).inflate(R.layout.dialog_brightness, null);
+            View localView = LayoutInflater.from(activity).inflate(R.layout.dialog_brightness, null);
             mDialogBrightnessTextView = localView.findViewById(R.id.tv_brightness);
             mDialogBrightnessProgressBar = localView.findViewById(R.id.brightness_progressbar);
             mBrightnessDialog = createDialogWithView(localView);
@@ -494,7 +588,7 @@ public class PlayerController extends FrameLayout implements View.OnClickListene
 
     private void showVolumeDialog(int volumePercent) {
         if (mVolumeDialog == null) {
-            View localView = LayoutInflater.from(context).inflate(R.layout.dialog_volume, null);
+            View localView = LayoutInflater.from(activity).inflate(R.layout.dialog_volume, null);
             mDialogVolumeImageView = localView.findViewById(R.id.volume_image_tip);
             mDialogVolumeTextView = localView.findViewById(R.id.tv_volume);
             mDialogVolumeProgressBar = localView.findViewById(R.id.volume_progressbar);
@@ -520,6 +614,7 @@ public class PlayerController extends FrameLayout implements View.OnClickListene
 
     public interface ScreenListener {
         void changeScreen(Boolean stopIt);
+
         void finishDontClean(Boolean clean);
     }
 
@@ -530,18 +625,21 @@ public class PlayerController extends FrameLayout implements View.OnClickListene
         this.screenListener = screenListener;
     }
 
-    private  IjkVideoView ijkVideoView;
-    private FrameLayout baseFramelayout;
+
     @Override
-    public void setWindowManageSupport(FrameLayout frameLayout ,IjkVideoView ijkVideoView) {
+    public void setWindowManageSupport(FrameLayout frameLayout, IjkVideoView ijkVideoView) {
         baseFramelayout = frameLayout;
         this.ijkVideoView = ijkVideoView;
+    }
+
+    @Override
+    public boolean isPlaying() {
+        return iMediaPlayer == null ? false : iMediaPlayer.isPlaying();
     }
 
     private void invisibleView() {
         if (isViewVisible) {
             lockScreen.setVisibility(INVISIBLE);
-            //   progressBar.setVisibility(INVISIBLE);
             vName.setVisibility(INVISIBLE);
             lockScreen.setVisibility(INVISIBLE);
             pauseStart.setVisibility(INVISIBLE);
@@ -552,7 +650,6 @@ public class PlayerController extends FrameLayout implements View.OnClickListene
             smallscreen.setVisibility(INVISIBLE);
         } else {
             lockScreen.setVisibility(VISIBLE);
-            //   progressBar.setVisibility(VISIBLE);
             vName.setVisibility(VISIBLE);
             lockScreen.setVisibility(VISIBLE);
             pauseStart.setVisibility(VISIBLE);

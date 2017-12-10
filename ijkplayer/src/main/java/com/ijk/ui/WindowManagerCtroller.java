@@ -28,7 +28,7 @@ public class WindowManagerCtroller implements View.OnClickListener {
     private volatile static WindowManagerCtroller windowManagerCtroller;
     private static android.view.WindowManager androidWindowManager;
     private static DisplayMetrics dm;
-    private boolean wasCreated = false;
+    private static  boolean cantCreate = false;
     private FrameLayout frameLayout;
     private IjkVideoView ijkVideoView;
 
@@ -51,10 +51,14 @@ public class WindowManagerCtroller implements View.OnClickListener {
         return windowManagerCtroller;
     }
 
+    public void setCantCreate(boolean cantCreate){
+        WindowManagerCtroller.cantCreate = cantCreate;
+    }
+
     private ViewController viewController;
-    public void createWindowView(ViewController viewController, IjkVideoView ijkVideoView) {
-        if (wasCreated) {
-            return;
+    public boolean createWindowView(ViewController viewController, IjkVideoView ijkVideoView) {
+        if (cantCreate) {
+            return !cantCreate;
         }
         this.viewController = viewController;
         this.ijkVideoView = ijkVideoView;
@@ -75,8 +79,8 @@ public class WindowManagerCtroller implements View.OnClickListener {
         configs.floatingViewY = dm.heightPixels / 4;
         configs.overMargin = -(int) (8 * dm.density);
         this.windowManager.andWindowView(windowView, configs);
-        wasCreated = !wasCreated;
-
+        cantCreate = !cantCreate;
+        return !cantCreate;
     }
 
     @Override
@@ -105,7 +109,7 @@ public class WindowManagerCtroller implements View.OnClickListener {
         if (null != windowManagerCtroller) {
             windowManagerCtroller = null;
         }
-        wasCreated = false;
+        cantCreate = false;
     }
 
 }

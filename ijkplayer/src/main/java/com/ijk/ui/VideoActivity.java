@@ -17,7 +17,6 @@
 
 package com.ijk.ui;
 
-import android.app.Activity;
 import android.os.Bundle;
 import android.support.v7.app.AppCompatActivity;
 import android.util.Log;
@@ -28,7 +27,7 @@ import android.widget.FrameLayout;
 import com.alibaba.android.arouter.facade.annotation.Route;
 
 import com.ijk.R;
-import com.ijk.media.MediaController;
+import com.ijk.media.IMediaController;
 import com.ijk.media.PlayerController;
 
 import tv.danmaku.ijk.media.player.IjkMediaPlayer;
@@ -43,11 +42,10 @@ public class VideoActivity extends AppCompatActivity {
 
     private String mVideoPath;
     private String mVideoName;
-    private  static IjkVideoView mVideoView;
-    private boolean mBackPressed;
-    private static MediaController mediaController;
+    private static IjkVideoView mVideoView;
+    private IMediaController.MediaController mediaController;
     private FrameLayout frameLayout;
-    private boolean clean;
+    private boolean clean = true;
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
@@ -62,43 +60,41 @@ public class VideoActivity extends AppCompatActivity {
 
         // init player
 
+        mediaController = IMediaController.getMediaController(getApplication());
+        mediaController.setScreenListener(new PlayerController.ScreenListener() {
+            //                锁定屏幕
+            @Override
+            public void changeScreen(Boolean stopIt) {
+                if (stopIt) {
+                    AutoChangeScreenUtils.init(VideoActivity.this).stop();
+                } else {
+                    AutoChangeScreenUtils.init(VideoActivity.this).start(VideoActivity.this);
+                }
+            }
 
+            //              切换至悬浮窗了
+            @Override
+            public void finishDontClean(Boolean clean) {
+                VideoActivity.this.clean = clean;
+                finish();
+            }
+        });
         if (null == mVideoView) {
             IjkMediaPlayer.loadLibrariesOnce(null);
             IjkMediaPlayer.native_profileBegin("libijkplayer.so");
-            Log.e("null == mVideoView", "-----------");
-
             mVideoPath = getIntent().getStringExtra("videoPath");
             mVideoName = getIntent().getStringExtra("videoTitle");
             mVideoView = new IjkVideoView(this);
-
             mVideoView.setLayoutParams(fl);
-            frameLayout.addView(mVideoView);
-            mediaController = new PlayerController(this);
-            mediaController.setControllerView(mVideoView,this);
-            mediaController.setScreenListener(new PlayerController.ScreenListener() {
-                @Override
-                public void changeScreen(Boolean stopIt) {
-                    if (stopIt) {
-                        AutoChangeScreenUtils.init(VideoActivity.this).stop();
-                    } else {
-                        AutoChangeScreenUtils.init(VideoActivity.this).start(VideoActivity.this);
-                    }
-                }
-
-                @Override
-                public void finishDontClean(Boolean clean) {
-                    VideoActivity.this.clean = clean;
-                    finish();
-                }
-            });
+            mediaController.setControllerView(mVideoView, this);
             mediaController.setVideoPathOrUri(mVideoPath, null);
             mediaController.setVideoName(mVideoName);
             mediaController.setlooping(false);
             mediaController.setWindowManageSupport(frameLayout, mVideoView);
+            frameLayout.addView(mVideoView);
             mediaController.start();
-        }else {
-            Log.e(TAG, "mediaController:" + mediaController);
+        } else {
+            mediaController.setControllerView(mVideoView, this);
             mediaController.setWindowManageSupport(frameLayout, mVideoView);
             mVideoView.setLayoutParams(fl);
             frameLayout.addView(mVideoView);
@@ -108,25 +104,40 @@ public class VideoActivity extends AppCompatActivity {
 
     @Override
     public void onBackPressed() {
-        mBackPressed = true;
         super.onBackPressed();
+        quitPlayAndFinish();
+    }
+
+    private void quitPlayAndFinish() {
+        if (null != mediaController) {
+            mediaController.release();
+            mediaController = null;
+            mVideoView = null;
+        }
+        if (null != mVideoName) {
+            mVideoName = null;
+        }
+        if (null != mVideoPath) {
+            mVideoPath = null;
+        }
+        IMediaController.cleanIMediaController();
+        finish();
     }
 
     @Override
     protected void onStop() {
-        //frameLayout.removeView(mVideoView);
-        //mediaController.uiInisibleButVideoPlaying();
+        if (null != mediaController) {
+            mediaController.uiInisibleButVideoPlaying();
+        }
+
         super.onStop();
     }
 
     @Override
     protected void onDestroy() {
         super.onDestroy();
-        if (!clean){
-            Log.e(TAG, "clean");
-
-            mVideoView = null;
-            mediaController.release();
+        if (clean) {
+            quitPlayAndFinish();
         }
         AutoChangeScreenUtils.init(this).stop();
     }
