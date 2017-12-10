@@ -352,12 +352,13 @@ public class PlayerController extends FrameLayout implements View.OnClickListene
                 if (null != activity) {
                     activity = null;
                 }
-                boolean isCreate = WindowManagerCtroller.getWindowManagerCtroller(context).createWindowView(viewController, ijkVideoView);
-                if (isCreate){
-                    screenListener.finishDontClean(false);
-                }else {
-                    screenListener.finishDontClean(true);
-                }
+                screenListener.finishDontClean(false);
+                WindowManagerCtroller.getWindowManagerCtroller(context).createWindowView(viewController, ijkVideoView);
+//                if (isCreate){
+//                    screenListener.finishDontClean(false);
+//                }else {
+//                    screenListener.finishDontClean(true);
+//                }
             } else {
                 WindowUtils.showDialogTipUserRequestPermission(activity);
             }

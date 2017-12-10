@@ -28,7 +28,7 @@ public class WindowManagerCtroller implements View.OnClickListener {
     private volatile static WindowManagerCtroller windowManagerCtroller;
     private static android.view.WindowManager androidWindowManager;
     private static DisplayMetrics dm;
-    private static  boolean cantCreate = false;
+    private  boolean cantCreate = false;
     private FrameLayout frameLayout;
     private IjkVideoView ijkVideoView;
 
@@ -52,7 +52,7 @@ public class WindowManagerCtroller implements View.OnClickListener {
     }
 
     public void setCantCreate(boolean cantCreate){
-        WindowManagerCtroller.cantCreate = cantCreate;
+        this.cantCreate = cantCreate;
     }
 
     private ViewController viewController;

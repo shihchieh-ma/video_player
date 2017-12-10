@@ -159,8 +159,10 @@ public class IjkVideoView extends FrameLayout implements ViewController {
 
     @Override
     public void setPlayerController(PlayerController playerController) {
-        
-        addView(playerController);
+        if (null == playerController.getParent()){
+            addView(playerController);
+        }
+
         this.playerController = playerController;
     }
 
@@ -245,7 +247,7 @@ public class IjkVideoView extends FrameLayout implements ViewController {
                     mRenderView.setVideoSampleAspectRatio(mVideoSarNum, mVideoSarDen);
                     if (!mRenderView.shouldWaitForResize() || mSurfaceWidth == mVideoWidth && mSurfaceHeight == mVideoHeight) {
                         handler.sendEmptyMessage(PlayerController.START);
-                        WindowManagerCtroller.getWindowManagerCtroller(mAppContext).setCantCreate(true);
+                       // WindowManagerCtroller.getWindowManagerCtroller(mAppContext).setCantCreate(true);
                         handler.sendEmptyMessage(PlayerController.KEEPGOING);
                         playerController.start();
                     }
@@ -258,7 +260,7 @@ public class IjkVideoView extends FrameLayout implements ViewController {
             new IMediaPlayer.OnCompletionListener() {
                 @Override
                 public void onCompletion(IMediaPlayer mp) {
-                    WindowManagerCtroller.getWindowManagerCtroller(mAppContext).setCantCreate(false);
+                    //WindowManagerCtroller.getWindowManagerCtroller(mAppContext).setCantCreate(false);
                     if (null != handler) {
                         handler.sendEmptyMessage(PlayerController.STOP);
                     }
