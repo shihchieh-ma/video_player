@@ -7,7 +7,12 @@
 大致功能有了，但是问题还是多，有时间继续改吧。
 
 ## 截图
-``
+
+<center>
+    <img src="https://github.com/Marlborn/video_player/blob/master/screenshort/1.png"/>
+    <img src="https://github.com/Marlborn/video_player/blob/master/screenshort/2.png"/>
+</center>
+
 >![image](https://github.com/Marlborn/video_player/blob/master/screenshort/1.png)
 
 >![image](https://github.com/Marlborn/video_player/blob/master/screenshort/2.png)
@@ -17,4 +22,4 @@
 >![image](https://github.com/Marlborn/video_player/blob/master/screenshort/4.png)
 
 >![image](https://github.com/Marlborn/video_player/blob/master/screenshort/5.png)
-``
+
