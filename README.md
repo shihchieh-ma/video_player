@@ -8,18 +8,11 @@
 
 ## 截图
 
-<center>
-    <img src="https://github.com/Marlborn/video_player/blob/master/screenshort/1.png"/>
-    <img src="https://github.com/Marlborn/video_player/blob/master/screenshort/2.png"/>
+<center class="half">
+    <img src="https://github.com/Marlborn/video_player/blob/master/screenshort/1.png" width="240"/>
+    <img src="https://github.com/Marlborn/video_player/blob/master/screenshort/2.png" width="240"/>
+    <img src="https://github.com/Marlborn/video_player/blob/master/screenshort/3.png" width="240"/>
+    <img src="https://github.com/Marlborn/video_player/blob/master/screenshort/4.png" width="240"/>
+    <img src="https://github.com/Marlborn/video_player/blob/master/screenshort/5.png" width="240"/>
 </center>
-
->![image](https://github.com/Marlborn/video_player/blob/master/screenshort/1.png)
-
->![image](https://github.com/Marlborn/video_player/blob/master/screenshort/2.png)
-
->![image](https://github.com/Marlborn/video_player/blob/master/screenshort/3.png)
-
->![image](https://github.com/Marlborn/video_player/blob/master/screenshort/4.png)
-
->![image](https://github.com/Marlborn/video_player/blob/master/screenshort/5.png)
 
